@@ -1,9 +1,30 @@
+# ---------------------------------------------------
+# StorageClass for MySQL
+# ---------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: roboshop-dynamic-ebs-mysql
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+---
+# ---------------------------------------------------
+# MySQL Headless Service
+# ---------------------------------------------------
 apiVersion: v1
 kind: Service
 metadata:
   name: mysql
   namespace: roboshop
+  labels:
+    app: mysql
+    tier: db
+    project: roboshop
 spec:
+  clusterIP: None    # headless service for stable DNS
   selector:
     app: mysql
     tier: db
@@ -11,33 +32,35 @@ spec:
   ports:
   - name: mysql-port
     protocol: TCP
-    port: 3306 # this port belongs to service
-    targetPort: 3306 # this port belongs to container
+    port: 3306
+    targetPort: 3306
 ---
-apiVersion: apps/v1 
-kind: StatefulSet 
+# ---------------------------------------------------
+# MySQL StatefulSet
+# ---------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
   name: mysql
-  namespace: roboshop 
-  labels:    # # these labels belong to deployment
+  namespace: roboshop
+  labels:
     app: mysql
     tier: db
     project: roboshop
 spec:
-  clusterIP: None
+  serviceName: "mysql"
+  replicas: 1
   selector:
     matchLabels:
-      app: mysql # has to match .spec.template.metadata.labels
+      app: mysql
       tier: db
       project: roboshop
-  serviceName: "mysql"
-  replicas: 1 # by default is 1 
   template:
     metadata:
       labels:
-        app: mysql # has to match .spec.selector.matchLabels
+        app: mysql
         tier: db
-        project: roboshop       
+        project: roboshop
     spec:
       containers:
       - name: mysql
@@ -53,24 +76,24 @@ spec:
           mountPath: /var/lib/mysql
   volumeClaimTemplates:
   - metadata:
-      name: mysql-config
+      name: mysql-data
     spec:
       accessModes: [ "ReadWriteOnce" ]
-      storageClassName: "roboshop-dynamic-ebs"
+      storageClassName: "roboshop-dynamic-ebs-mysql"
       resources:
         requests:
           storage: 5Gi
-  
-...    
-  
-
+---
+# ---------------------------------------------------
+# MySQL ConfigMap
+# ---------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mysql-config
   namespace: roboshop
 data:
-  MYSQL_ALLOW_EMPTY_PASSWORD: "yes" # keep true in double quotes
+  MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
   MYSQL_DATABASE: "cities"
   MYSQL_USER: "shipping"
   MYSQL_PASSWORD: "RoboShop@1"
