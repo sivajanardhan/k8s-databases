@@ -54,7 +54,7 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: mongodb
-          image: joindevops/mongodb
+          image: joindevops/mongodb:v1
           ports:
             - containerPort: 27017
               name: mongodb-port
